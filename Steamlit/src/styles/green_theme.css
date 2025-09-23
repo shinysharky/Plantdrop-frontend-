@@ -1,0 +1,38 @@
+/* Header */
+/* Header-Styles */
+h1 {
+    background: radial-gradient(ellipse at top left, white, #8AB162, black) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    color: transparent !important;
+    font-size: 2.5em !important;
+}
+
+h2 {
+    color: #5F674C !important;
+    font-size: 2em !important;
+}
+
+h3 {
+    color: #747D5A !important;
+    font-size: 1.5em !important;
+}
+
+/* Normal Text */
+p {
+    color: #FFFFFF !important;
+    font-size: 1.1em !important;
+}
+
+/* Sidebar Hintergrundfarbe */
+[data-testid="stSidebar"] {
+    background-color: #111810 !important;
+}
+
+/* Sidebar Textfarbe */
+[data-testid="stSidebar"] .css-1d391kg {
+    color: white;
+}
+
+
