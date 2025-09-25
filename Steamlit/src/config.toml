@@ -1,0 +1,12 @@
+[client]
+showErrorDetails = "none"
+
+
+
+[theme]
+base = "dark"
+primaryColor="#4f5a3c"
+backgroundColor="#111810"
+secondaryBackgroundColor="#484e37"
+textColor="#ffffff"
+font = "Playfair Display"
