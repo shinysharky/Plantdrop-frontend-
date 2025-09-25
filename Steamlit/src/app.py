@@ -1,11 +1,20 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
 import altair as alt
 import time
+import sys
+import os
+
+# Add the parent folder (project root) to Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add Scripts folder to Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Scripts')))
+
+from Scripts.frontend_connection import Frontend_connector
 
 st.set_page_config(page_title = "Plantdrop", page_icon="src/styles/image-15.ico", layout = "wide")
 
+db = Frontend_connector()
 
 def inject_css(file_path):
     with open(file_path) as f:
@@ -35,42 +44,23 @@ main_page = st.sidebar.selectbox("Seite wählen:", ["Startseite", "Meldungen", "
 # Falls Raumübersicht gewählt wird → Räume auswählen
 selected_room = None
 if main_page == "Raumübersicht":
-    selected_room = st.sidebar.selectbox("Raum auswählen:", ["Raum 1", "Raum 2", "Raum 3"])
+    rooms = db.show_rooms()
+    selected_room = st.sidebar.selectbox("Raum auswählen:", rooms)
 
 # ---------------- Seiteninhalte -----------------
 if main_page == "Startseite":
     st.title("Willkommen bei Plantdrop")
     st.header("Startseite")
 
-    ############## CO2 Messung Chart ####################
-    st.subheader("CO₂-Gehalt")
 
-    try:
-        df = pd.read_csv("data.csv")
-
-        # Datum/Zeitspalte in datetime umwandeln
-        df["timestamp_measurement"] = pd.to_datetime(df["timestamp_measurement"])
-
-        if not df.empty:
-            co2chart = alt.Chart(df).mark_area(
-                opacity=0.5,
-                color="#618B35"
-            ).encode(
-                x=alt.X('timestamp_measurement:T', axis=alt.Axis(title='Zeitpunkt')),
-                y=alt.Y('feuchtigkeit:Q', axis=alt.Axis(title='Feuchtigkeit (%)'), scale=alt.Scale(domain=[0, 100]))
-            )
-            st.altair_chart(co2chart, use_container_width=True)
-        else:
-            st.info("Keine Messdaten gefunden.")
-    except Exception as e:
-        st.error(f"Fehler beim Laden der CSV-Datei: {e}")
+    df = db.select_all_measurements()
+    #df = pd.read_csv("data.csv") #testing_database
 
 
-    ############## Wasser Messung Chart ####################
+############## Wasser Messung Chart ####################
     st.subheader("Wassergehalt")
 
     try:
-        df = pd.read_csv("data.csv")
         df["timestamp_measurement"] = pd.to_datetime(df["timestamp_measurement"])
 
         if not df.empty:
@@ -90,7 +80,6 @@ if main_page == "Startseite":
     st.subheader("Lichtintensität")
 
     try:
-        df = pd.read_csv("data.csv")
         df["timestamp_measurement"] = pd.to_datetime(df["timestamp_measurement"])
         if not df.empty:
             line = alt.Chart(df).mark_line(color="#8b8a35").encode(
@@ -112,7 +101,6 @@ if main_page == "Startseite":
     st.subheader("Luftfeuchtigkeit & Lufttemperatur")
 
     try:
-        df = pd.read_csv("data.csv")
         df["timestamp_measurement"] = pd.to_datetime(df["timestamp_measurement"])
 
         if not df.empty:
@@ -174,7 +162,6 @@ if main_page == "Startseite":
     st.subheader("Bodenfeuchtigkeit")
 
     try:
-        df = pd.read_csv("data.csv")
         df["timestamp_measurement"] = pd.to_datetime(df["timestamp_measurement"])
 
         if not df.empty:
@@ -189,7 +176,8 @@ if main_page == "Startseite":
     except Exception as e:
         st.error(f"Fehler beim Laden der CSV-Datei: {e}")
 
-# ---------------- Raum -----------------
+
+
 
 elif main_page == "Raumübersicht":
     st.header("Raumübersicht")
@@ -199,43 +187,38 @@ elif main_page == "Raumübersicht":
 
         # --- Pflanzenübersicht --------
         st.write("Pflanzenübersicht")
-        if selected_room == "Raum 1":
-            plants = pd.DataFrame({
-                "Pflanze": ["Elium", "Rose", "Tuple", "Ficus", "Aloe Vera", "Kaktus"],
-                "Ort": ["Fensterbank", "Regal", "Tisch", "Schrank", "Ecke", "Fenster"],
-                "Status": ["OK", "!Braucht Wasser", "OK", "OK", "!Zu viel Wasser", "OK"],
-                "CO₂ (ppm)": [420, 500, 430, 410, 480, 390],
-                "Wasserstand (L)": [2.3, 1.1, 2.8, 2.5, 0.5, 3.0],
-                "Wasser pro Tag (L)": [1.5, 2.0, 1.0, 1.2, 0.3, 0.1]
-            })
-        elif selected_room == "Raum 2":
-            plants = pd.DataFrame({
-                "Pflanze": ["Bonsai", "Lavendel", "Spinnen Lilie"],
-                "Ort": ["Tisch B", "Ausbilderplatz", "Druckerraum"],
-                "Status": ["OK", "OK", "Braucht Wasser"],
-                "CO₂ (ppm)": [410, 425, 450],
-                "Wasserstand (L)": [2.0, 2.5, 0.9],
-                "Wasser pro Tag (L)": [1.2, 1.8, 0.7]
-            })
-        else:  # Raum 3
-            plants = pd.DataFrame({
-                "Pflanze": ["Orchidee", "Hyantinze", "Gänseblümchen"],
-                "Ort": ["Topf 1", "Topf 2", "Topf 3"],
-                "Status": ["OK", "OK", "OK"],
-                "CO₂ (ppm)": [430, 440, 420],
-                "Wasserstand (L)": [2.1, 2.4, 2.7],
-                "Wasser pro Tag (L)": [1.0, 1.5, 0.8]
-            })
+        rooms = db.show_rooms()
+        for room in rooms:
+            if selected_room == room:
+                plants = db.roomquerry(room)
+                plants = plants.rename(columns={
+                    "plantid": "id",
+                    "plant_name": "Pflanze",
+                    "plant_type": "Pflanzenart",
+                    "minimum_water": "Gießung_Schwellwert (%)",
+                    "feuchtigkeit": "Bodenfeuchtigkeit (%)",  
+                    "kohlenstoffdioxid": "CO₂ (ppm)",
+                    "wasserstand": "Wasserstand (L)",
+                    "luftfeuchtigkeit": "Luftfeuchtigkeit",
+                    "lux": "Helligkeit(lux)",
+                    "lufttemperatur": "Lufttemperatur (°C)",
+                    "error_msg": "Status"  
+                    })
 
         # Tabelle editierbar machen → nur bestimmte Spalten freigeben
         edited_plants = st.data_editor(
             plants,
             column_config={
+                "id": st.column_config.NumberColumn(disabled=True),
                 "Pflanze": st.column_config.TextColumn(disabled=False),
-                "Ort": st.column_config.TextColumn(disabled=False),
-                "Wasser pro Tag (L)": st.column_config.NumberColumn(disabled=False),
+                "Pflanzenart": st.column_config.TextColumn(disabled=False),
+                "Bodenfeuchtigkeit": st.column_config.NumberColumn(disabled=True),
+                "Gießung_Schwellwert (%)": st.column_config.NumberColumn(disabled=False),
                 "Status": st.column_config.TextColumn(disabled=True),
                 "CO₂ (ppm)": st.column_config.NumberColumn(disabled=True),
+                "Luftfeuchtigkeit": st.column_config.NumberColumn(disabled=True),
+                "Lufttemperatur (°C)": st.column_config.NumberColumn(disabled=True),
+                "Helligkeit(lux)": st.column_config.NumberColumn(disabled=True),
                 "Wasserstand (L)": st.column_config.NumberColumn(disabled=True),
             },
             disabled=False,  # wichtig, damit Config wirkt
@@ -243,9 +226,13 @@ elif main_page == "Raumübersicht":
         )
 
         if st.button("Änderungen speichern"):
-            st.success("Änderungen übernommen (momentan nur im Speicher).")
+            db.update_raumuebersicht(edited_plants)
 
-# ---------------- Meldungen -----------------
+            
+            st.success("Änderungen übernommen.")
+            
+
+
 
 elif main_page == "Meldungen":
     st.header("Meldungen")
