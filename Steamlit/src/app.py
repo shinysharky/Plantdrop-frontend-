@@ -44,43 +44,152 @@ if main_page == "Startseite":
 
     ############## CO2 Messung Chart ####################
     st.subheader("CO₂-Gehalt")
-    try:
-        conn = sqlite3.connect("co2_messungen.db")
-        query = "SELECT zeitpunkt, co2_ppm FROM CO2Messung ORDER BY zeitpunkt"
-        co2data = pd.read_sql_query(query, conn)
-        conn.close()
 
-        if not co2data.empty:
-            co2chart = alt.Chart(co2data).mark_line(point=True, opacity=0.8).encode(
-                x='zeitpunkt:T',
-                y='co2_ppm:Q',
-                color=alt.value('#618B35')
+    try:
+        df = pd.read_csv("data.csv")
+
+        # Datum/Zeitspalte in datetime umwandeln
+        df["timestamp_measurement"] = pd.to_datetime(df["timestamp_measurement"])
+
+        if not df.empty:
+            co2chart = alt.Chart(df).mark_area(
+                opacity=0.5,
+                color="#618B35"
+            ).encode(
+                x=alt.X('timestamp_measurement:T', axis=alt.Axis(title='Zeitpunkt')),
+                y=alt.Y('feuchtigkeit:Q', axis=alt.Axis(title='Feuchtigkeit (%)'), scale=alt.Scale(domain=[0, 100]))
             )
             st.altair_chart(co2chart, use_container_width=True)
         else:
-            st.info("Keine CO₂-Messdaten gefunden.")
+            st.info("Keine Messdaten gefunden.")
     except Exception as e:
-        st.error(f"Fehler beim Laden der CO₂-Datenbank: {e}")
-    
-    ############## Wasser Messung Chart ####################
-    st.subheader("Wassergehalt") 
-    try: 
-        conn = sqlite3.connect("wasserverbrauch.db") 
-        query = """ SELECT w.zeitpunkt, w.wasserstand_liter, b.name FROM Wasserverbrauch w JOIN Behaelter b ON w.behaelter_id = b.behaelter_id ORDER BY w.zeitpunkt """ 
-        waterdata = pd.read_sql_query(query, conn) 
-        conn.close() 
+        st.error(f"Fehler beim Laden der CSV-Datei: {e}")
 
-        if not waterdata.empty: 
-            waterchart = alt.Chart(waterdata).mark_bar(opacity=0.7).encode(
-                x='zeitpunkt:T', 
-                y='wasserstand_liter:Q', 
-                color=alt.value('#89AFD6') 
-            ) 
-            st.altair_chart(waterchart, use_container_width=True) 
-        else: 
-            st.info("Keine Wasserverbrauchsdaten gefunden.") 
-    except Exception as e: 
-        st.error(f"Fehler beim Laden der Datenbank: {e}")
+
+    ############## Wasser Messung Chart ####################
+    st.subheader("Wassergehalt")
+
+    try:
+        df = pd.read_csv("data.csv")
+        df["timestamp_measurement"] = pd.to_datetime(df["timestamp_measurement"])
+
+        if not df.empty:
+            waterchart = alt.Chart(df).mark_bar(opacity=0.7).encode(
+                x=alt.X('timestamp_measurement:T', axis=alt.Axis(title='Zeitpunkt')),
+                y=alt.Y('wasserstand:Q', axis=alt.Axis(title='Wasserstand (mL)'), scale=alt.Scale(domain=[0, 100])),
+                color=alt.value('#89AFD6')
+            )
+            st.altair_chart(waterchart, use_container_width=True)
+        else:
+            st.info("Keine Wasserverbrauchsdaten gefunden.")
+    except Exception as e:
+        st.error(f"Fehler beim Laden der CSV-Datei: {e}")
+
+    
+    ############## Licht Messung Chart ####################
+    st.subheader("Lichtintensität")
+
+    try:
+        df = pd.read_csv("data.csv")
+        df["timestamp_measurement"] = pd.to_datetime(df["timestamp_measurement"])
+        if not df.empty:
+            line = alt.Chart(df).mark_line(color="#8b8a35").encode(
+                x=alt.X('timestamp_measurement:T', axis=alt.Axis(title='Zeitpunkt')),
+                y=alt.Y('lux:Q', axis=alt.Axis(title='Lichtintensität (Lux)'))
+            )
+            points = alt.Chart(df).mark_point(opacity=0.5, color="#8b8a35").encode(
+                x=alt.X('timestamp_measurement:T'),
+                y=alt.Y('lux:Q')
+            )
+            lightchart = line + points
+            st.altair_chart(lightchart, use_container_width=True)
+        else:
+            st.info("Keine Messdaten gefunden.")
+    except Exception as e:
+        st.error(f"Fehler beim Laden der CSV-Datei: {e}")
+
+    ############## Luft ####################
+    st.subheader("Luftfeuchtigkeit & Lufttemperatur")
+
+    try:
+        df = pd.read_csv("data.csv")
+        df["timestamp_measurement"] = pd.to_datetime(df["timestamp_measurement"])
+
+        if not df.empty:
+            # Farbdefinition
+            color_scale = alt.Scale(domain=["Luftfeuchtigkeit", "Lufttemperatur"],
+                                    range=["#1F77B4", "#D95F02"])
+
+            # Luftfeuchtigkeit
+            humidity_line = alt.Chart(df).mark_line().encode(
+                x=alt.X('timestamp_measurement:T', axis=alt.Axis(title='Zeitpunkt')),
+                y=alt.Y('luftfeuchtigkeit:Q', axis=alt.Axis(title='Luftfeuchtigkeit (%)')),
+                color=alt.value("#1F77B4")
+            )
+            humidity_points = alt.Chart(df).mark_point(opacity=0.5).encode(
+                x='timestamp_measurement:T',
+                y='luftfeuchtigkeit:Q',
+                color=alt.value("#1F77B4")
+            )
+
+            # Lufttemperatur
+            temperature_line = alt.Chart(df).mark_line().encode(
+                x='timestamp_measurement:T',
+                y=alt.Y('lufttemperatur:Q', axis=alt.Axis(title='Lufttemperatur (°C)')),
+                color=alt.value("#D95F02")
+            )
+            temperature_points = alt.Chart(df).mark_point(opacity=0.5).encode(
+                x='timestamp_measurement:T',
+                y='lufttemperatur:Q',
+                color=alt.value("#D95F02")
+            )
+
+            humidity_chart = humidity_line + humidity_points
+            temperature_chart = temperature_line + temperature_points
+
+            combined_chart = alt.layer(
+                humidity_chart,
+                temperature_chart
+            ).resolve_scale(
+                y='independent'
+            )
+
+            legend = alt.Chart(pd.DataFrame({
+                'Variable': ["Luftfeuchtigkeit", "Lufttemperatur"],
+                'color': ["#1F77B4", "#D95F02"]
+            })).mark_point(size=0).encode(
+                color=alt.Color('Werte:N', scale=color_scale, legend=alt.Legend(orient="bottom"))
+            )
+
+            final_chart = combined_chart & legend
+
+            st.altair_chart(final_chart, use_container_width=True)
+        else:
+            st.info("Keine Messdaten gefunden.")
+
+    except Exception as e:
+        st.error(f"Fehler beim Laden der CSV-Datei: {e}")
+
+    ############## Bodenfeuchtigkeit ####################
+    st.subheader("Bodenfeuchtigkeit")
+
+    try:
+        df = pd.read_csv("data.csv")
+        df["timestamp_measurement"] = pd.to_datetime(df["timestamp_measurement"])
+
+        if not df.empty:
+            groundchart = alt.Chart(df).mark_area(opacity=0.5).encode(
+                x=alt.X('timestamp_measurement:T', axis=alt.Axis(title='Zeitpunkt')),
+                y=alt.Y('feuchtigkeit:Q', axis=alt.Axis(title='Bodenfeuchtigkeit (%)'), scale=alt.Scale(domain=[0, 100])),
+                color=alt.value('#89AFD6')
+            )
+            st.altair_chart(groundchart, use_container_width=True)
+        else:
+            st.info("Keine Wasserverbrauchsdaten gefunden.")
+    except Exception as e:
+        st.error(f"Fehler beim Laden der CSV-Datei: {e}")
+
+# ---------------- Raum -----------------
 
 elif main_page == "Raumübersicht":
     st.header("Raumübersicht")
@@ -136,7 +245,7 @@ elif main_page == "Raumübersicht":
         if st.button("Änderungen speichern"):
             st.success("Änderungen übernommen (momentan nur im Speicher).")
 
-
+# ---------------- Meldungen -----------------
 
 elif main_page == "Meldungen":
     st.header("Meldungen")
